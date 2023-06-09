@@ -12,7 +12,7 @@ import	functools
 print	= functools.partial( print, flush = True )
 
 FILENAME	= "mpl115.csv"
-FS			= 18.2719		# sampling rate
+FS			= 10			# sampling rate
 
 WINDOW	= "blackmanharris"
 

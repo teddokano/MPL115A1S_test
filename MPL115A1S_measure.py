@@ -1,4 +1,4 @@
-from	machine		import	SPI, Pin
+from	machine		import	SPI, Pin, Timer
 from	utime		import	sleep, localtime
 from	struct		import	unpack
 import	os
@@ -60,41 +60,52 @@ class MPL115A1:
 		if self.cs:
 			self.cs.value( state )
 
+def callback( x ):
+	global timer_flag
+	timer_flag = True 
 
 def main():
+	global timer_flag
+	timer_flag	= False
 	DEPTH		= 1
 	LOG_FILE	= "mpl155.csv"
 	SPI_FREQ	= 1000000
+	SAMPLING	= 10
 
 	if "MIMXRT" in os.uname().machine:
 		spi		= SPI( 0, SPI_FREQ, cs = 0 )
 		sensor	= MPL115A1( spi, None )
-		led		= None
+		led		= Pin( "D4", Pin.OUT )
 		
 	elif "Raspberry Pi Pico" in os.uname().machine:
 		spi		= SPI( 1, SPI_FREQ, sck = Pin( 10 ), mosi = Pin( 11 ), miso = Pin( 12 ) )
 		sensor	= MPL115A1( spi, Pin( 13, Pin.OUT ) )
 		led		= Pin( "LED", Pin.OUT )
+	
+#	Timer ( 0, mode = Timer.PERIODIC, freq = SAMPLING, callback = callback )
+	Timer ( -1, mode = Timer.PERIODIC, freq = SAMPLING, callback = callback )
 
 	count	= 0
 
 	while True:
-		p	= 0;
-		
-		for i in range( DEPTH ):
-			p	+= sensor.pressure()
+		if timer_flag:
+			timer_flag	= False
+			led.value( 1 )
 	
-			if led:
-				led.value( i >> 4 & 0x1 )
+			p	= 0;
+			
+			for i in range( DEPTH ):
+				p	+= sensor.pressure()
+		
+			dt	= localtime()
+			p_str	= "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}, {}, {}".format( dt[ 0 ], dt[ 1 ], dt[ 2 ], dt[ 3 ], dt[ 4 ], dt[ 5 ], p / DEPTH * 10, count )
+			print( p_str )
 
-		dt	= localtime()
-		p_str	= "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}, {}, {}".format( dt[ 0 ], dt[ 1 ], dt[ 2 ], dt[ 3 ], dt[ 4 ], dt[ 5 ], p / DEPTH * 10, count )
-		print( p_str )
+			with open( "data.csv", "a" ) as f:
+				print( p_str, file = f )
 
-		with open( "data.csv", "a" ) as f:
-			print( p_str, file = f )
-
-		count	+= 1
+			count	+= 1
+			led.value( 0 )
 
 if __name__ == "__main__":
 	main()
